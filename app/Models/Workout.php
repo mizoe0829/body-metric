@@ -33,3 +33,4 @@ class Workout extends Model
         return $this->belongsTo(DailyMetric::class);
     }
 }
+

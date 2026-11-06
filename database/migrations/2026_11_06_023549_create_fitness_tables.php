@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. 目標設定テーブル
+        // 1. 目標・プロファイル設定テーブル
         Schema::create('goals', function (Blueprint $table) {
             $table->id();
+            $table->decimal('height', 5, 1)->default(172.0)->comment('身長(cm)');
+            $table->integer('age')->default(30)->comment('年齢');
+            $table->string('gender')->default('male')->comment('性別 (male/female/other)');
+            $table->string('workout_environment')->default('gym')->comment('運動環境 (gym/dumbbell/bodyweight)');
             $table->decimal('target_weight', 5, 2)->comment('目標体重(kg)');
             $table->decimal('target_body_fat', 4, 2)->nullable()->comment('目標体脂肪率(%)');
             $table->decimal('start_weight', 5, 2)->nullable()->comment('開始時体重(kg)');

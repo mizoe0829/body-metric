@@ -31,3 +31,4 @@ class DailyMetric extends Model
         return $this->hasMany(Workout::class);
     }
 }
+

@@ -12,8 +12,12 @@ class FitnessSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. デフォルト目標 (68kg / 15% / 3ヶ月後期日)
+        // 1. デフォルト目標 & プロファイル (65kg / 15% / 2ヶ月後期日)
         $goal = Goal::create([
+            'height' => 173.0,
+            'age' => 31,
+            'gender' => 'male',
+            'workout_environment' => 'gym',
             'target_weight' => 65.0,
             'target_body_fat' => 15.0,
             'start_weight' => 71.5,
@@ -125,3 +129,4 @@ class FitnessSeeder extends Seeder
         }
     }
 }
+

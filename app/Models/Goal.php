@@ -10,6 +10,10 @@ class Goal extends Model
     use HasFactory;
 
     protected $fillable = [
+        'height',
+        'age',
+        'gender',
+        'workout_environment',
         'target_weight',
         'target_body_fat',
         'start_weight',
@@ -21,6 +25,8 @@ class Goal extends Model
     ];
 
     protected $casts = [
+        'height' => 'float',
+        'age' => 'integer',
         'target_weight' => 'float',
         'target_body_fat' => 'float',
         'start_weight' => 'float',
