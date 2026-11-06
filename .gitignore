@@ -33,3 +33,7 @@ Thumbs.db
 /ai-service/.env
 /ai-service/bin/
 /ai-service/*.exe
+/ai-service/*.exe*
+*~
+*.bak
+test_*.php
