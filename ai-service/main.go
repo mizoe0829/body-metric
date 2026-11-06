@@ -35,6 +35,7 @@ type GoalInfo struct {
 	Age                int     `json:"age"`
 	Gender             string  `json:"gender"`
 	WorkoutEnvironment string  `json:"workout_environment"`
+	ActivityLevel      string  `json:"activity_level"`
 	TargetWeight       float64 `json:"target_weight"`
 	TargetBodyFat      float64 `json:"target_body_fat"`
 	StartWeight        float64 `json:"start_weight"`
@@ -248,6 +249,9 @@ func sanitizeWorkouts(items []WorkoutItem) []WorkoutItem {
 }
 
 func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
+	isBulk := strings.Contains(req.Goal.Objective, "増量") || strings.Contains(req.Goal.Objective, "バルクアップ")
+	isCut := strings.Contains(req.Goal.Objective, "減量") || strings.Contains(req.Goal.Objective, "除脂肪")
+
 	// 1. pace_status の検証
 	switch adv.PaceStatus {
 	case "on_track", "ahead", "behind", "plateau":
@@ -272,7 +276,13 @@ func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
 
 	// 3. テキストの欠落補正
 	if strings.TrimSpace(adv.PaceMessage) == "" {
-		adv.PaceMessage = "目標値に向けて着実に前進しています。日々の記録継続が最大の推進力です。"
+		if isBulk {
+			adv.PaceMessage = "バルクアップ（筋肥大）に向けた好調な推移です。十分な栄養と高負荷トレーニングを継続しましょう。"
+		} else if isCut {
+			adv.PaceMessage = "除脂肪・引き締めに向けた順調なペースです。筋肉量を落とさない強度を維持しましょう。"
+		} else {
+			adv.PaceMessage = "目標値に向けて着実に前進しています。日々の記録継続が最大の推進力です。"
+		}
 	}
 
 	if strings.TrimSpace(adv.TimelineGap) == "" {
@@ -280,22 +290,43 @@ func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
 	}
 
 	if strings.TrimSpace(adv.NextAction) == "" {
-		adv.NextAction = "前回のトレーニング部位を休ませ、バランスよく全身をローテーションしましょう。"
+		if isBulk {
+			adv.NextAction = "十分なエネルギーを補給した状態で、高重量×多セットで総負荷量を稼ぎましょう。"
+		} else if isCut {
+			adv.NextAction = "筋力シグナルを維持するため重量は落とさず、適度なセット数で大筋群を刺激しましょう。"
+		} else {
+			adv.NextAction = "前回のトレーニング部位を休ませ、バランスよく全身をローテーションしましょう。"
+		}
 	}
 
 	if strings.TrimSpace(adv.LifestyleTip) == "" {
-		adv.LifestyleTip = "十分なタンパク質補給（体重×1.5g目安）と1日2L以上の水分補給を心がけてください。"
+		if isBulk {
+			adv.LifestyleTip = "筋肉合成（アナボリック）を最大化するため、毎食の炭水化物（白米・イモ類）をしっかり確保し、睡眠8時間を意識してください。"
+		} else if isCut {
+			adv.LifestyleTip = "筋分解（カタボリック）を防ぐため高タンパク（体重×1.8g以上）を徹底し、1日2.5L以上の水分補給で代謝を維持しましょう。"
+		} else {
+			adv.LifestyleTip = "十分なタンパク質補給（体重×1.5g目安）と1日2L以上の水分補給を心がけてください。"
+		}
 	}
 
-	// 4. recommended_workout の検証
+	// 4. recommended_workout の検証（目的＆運動量レベルに応じて分岐）
 	if strings.TrimSpace(adv.RecommendedWorkout.Exercise) == "" {
+		suggestedSets := "10回 × 3セット"
+		if isBulk {
+			suggestedSets = "8〜10回 × 4セット"
+		} else if req.Goal.ActivityLevel == "sedentary" || req.Goal.ActivityLevel == "light" {
+			suggestedSets = "12〜15回 × 2〜3セット"
+		} else if req.Goal.ActivityLevel == "active" || req.Goal.ActivityLevel == "very_active" {
+			suggestedSets = "6〜10回 × 4〜5セット"
+		}
+
 		switch req.Goal.WorkoutEnvironment {
 		case "dumbbell":
 			adv.RecommendedWorkout = RecommendedWorkout{
 				TargetMuscle:    "背中",
 				Exercise:        "ダンベルワンハンドロウ",
 				SuggestedWeight: "14〜16kgダンベル",
-				SuggestedSets:   "10回 × 3セット",
+				SuggestedSets:   suggestedSets,
 				Point:           "背筋を伸ばし、肘を腰骨へ向かって引く意識で広背筋を収縮させましょう。",
 			}
 		case "bodyweight":
@@ -303,7 +334,7 @@ func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
 				TargetMuscle:    "胸・体幹",
 				Exercise:        "プッシュアップ (腕立て伏せ)",
 				SuggestedWeight: "自体重",
-				SuggestedSets:   "12〜15回 × 3セット",
+				SuggestedSets:   suggestedSets,
 				Point:           "体を一直線に保ち、胸を床ギリギリまで深く下ろしましょう。",
 			}
 		default:
@@ -311,7 +342,7 @@ func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
 				TargetMuscle:    "背中",
 				Exercise:        "ラットプルダウン または チンニング",
 				SuggestedWeight: "中重量（10回で適正負荷）",
-				SuggestedSets:   "10回 × 3セット",
+				SuggestedSets:   suggestedSets,
 				Point:           "肩甲骨を引き寄せて背筋全体でバーを引きましょう。",
 			}
 		}
@@ -407,16 +438,36 @@ func handleGenerateAdvice(w http.ResponseWriter, r *http.Request) {
 	reqBytes, _ := json.MarshalIndent(req, "", "  ")
 
 	prompt := fmt.Sprintf(`あなたは一流のプロパーソナルトレーナー・AIフィジカルコーチです。
-ユーザーが「最初に設定した目標値」と「直近の計測データ推移」を分析し、
+ユーザーが「最初に設定した目標値（目的・運動量レベル・環境）」と「直近の計測データ推移」を分析し、
 ユーザーのモチベーションを高めつつ、論理的で具体的かつ無理のない【3大処方箋】をJSON形式で返答してください。
 
 【ユーザーの目標・現在値・履歴データ】
 %s
 
-【考慮すべき要素】
-1. ペース診断: 目標期日までの残り日数と必要増減ペース、および直近の実測推移（週間増減率）を比較し、順調(on_track)、前倒し好調(ahead)、ペース低下(behind)、停滞(plateau)のいずれかを判定。
-2. 次回やるべき筋トレ: 直近の履歴で鍛えた部位をチェックし、超回復（48〜72時間の休養）を考慮して、ユーザーの運動環境（ジム/自宅ダンベル/自重）に適合した最適な部位・具体的種目・推奨重量・セット数を提案。
-3. 生活・食事のワンポイント: 具体的ですぐ実践できる一言（PFCバランス、水分量、睡眠、むくみ対策など）。
+【処方箋生成の厳格な考慮ルール】
+1. 目的（Objective）に応じたアプローチの完全切り分け:
+   - 「減量・除脂肪（Cut）」が目的の場合:
+     * 筋トレ: カロリー制限による筋分解を防ぐため、挙上重量（強度）は落とさず維持し、セット数は過度にしすぎない（2〜3セット）。大筋群（脚/背中/胸）を優先。
+     * 食事・生活: アンダーカロリー維持、高タンパク質（体重×1.8g以上）の摂取、水分2.5L以上の補給を指示。
+   - 「増量・バルクアップ（Bulk）」が目的の場合:
+     * 筋トレ: 総負荷量（Volume）最大化を狙い、高重量×多セット（4〜5セット、6〜10回）。しっかりインターバルを取り限界まで攻める。
+     * 食事・生活: オーバーカロリー維持、筋肉合成（アナボリック）を促すための炭水化物（白米・イモ類）摂取と睡眠8時間を指示。
+   - 「引き締め・細マッチョ・健康維持」が目的の場合:
+     * 8〜12回×3セットの王道バランスと、PFCバランス重視の生活指導。
+
+2. 運動量レベル（ActivityLevel）に応じた負荷・種目設計:
+   - "sedentary" / "light" (初心者〜軽運動):
+     * フォーム習得と怪我防止を最優先。マシンや軽量ダンベル・自重で12〜15回×2〜3セット。
+   - "moderate" (中級者・標準):
+     * 筋肥大の王道レンジ。8〜12回×3〜4セット。ダンベル12〜20kgまたはバーベル中重量。
+   - "active" / "very_active" (上級者・ヘビートレーニー):
+     * 高強度・限界突破。6〜10回×4〜5セット。高重量フリーウェイトや加重自重。
+
+3. 実績ベースの重量提案:
+   - 直近の履歴に種目・重量実績（例: ベンチ75kg）がある場合は、その数値を必ず参照し、同重量でのレップ数アップまたは+2.5kg漸進を提案すること。
+
+4. 超回復の考慮:
+   - 直近の履歴で鍛えた部位をチェックし、48〜72時間休養していない部位は避け、回復済みの別部位を提案すること。
 
 【返却JSONスキーマ】
 {
@@ -424,7 +475,7 @@ func handleGenerateAdvice(w http.ResponseWriter, r *http.Request) {
   "pace_status_label": "順調なペース | 前倒し好調 | 要ペース調整 | 停滞期ブレイク推奨",
   "pace_message": "客観的で励みになるペース分析（1〜2文）",
   "timeline_gap": "期日と目標体重までの残差・達成見込みに関する具体的数値（1〜2文）",
-  "next_action": "直近の部位疲労を踏まえた明日・次回のアクション方針（1〜2文）",
+  "next_action": "直近の部位疲労と目的に適した明日・次回のアクション方針（1〜2文）",
   "recommended_workout": {
     "target_muscle": "胸 | 背中 | 脚 | 肩 | 腕 | 腹",
     "exercise": "具体的種目名",
@@ -432,7 +483,7 @@ func handleGenerateAdvice(w http.ResponseWriter, r *http.Request) {
     "suggested_sets": "推奨回数・セット数 (例: 10回 × 3セット)",
     "point": "意識すべきフォームのコツやテンションのかけ方"
   },
-  "lifestyle_tip": "今すぐできる生活・食事ワンポイント助言"
+  "lifestyle_tip": "目的に合わせた具体的で今すぐできる生活・食事ワンポイント助言"
 }
 `, string(reqBytes))
 

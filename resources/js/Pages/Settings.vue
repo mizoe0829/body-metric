@@ -155,15 +155,24 @@
             </div>
           </div>
 
-          <div class="pt-2">
-            <label class="block text-xs font-semibold text-slate-300 mb-1">主な目的・フォーカス</label>
-            <input
-              v-model="form.objective"
-              type="text"
-              placeholder="例: 適正筋肉量を維持したまま体脂肪率15%・体重65kgへ引き締め"
-              required
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
-            />
+          <div class="pt-2 space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">
+                ボディメイクの主な目的 <span class="text-emerald-400">*</span>
+              </label>
+              <select
+                v-model="form.objective"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="減量・除脂肪（体重＆体脂肪率を落とす）">🔥 減量・除脂肪（体重・体脂肪を落とし筋量を死守する）</option>
+                <option value="増量・バルクアップ（筋肥大＆体重増）">💪 増量・バルクアップ（筋肉量を増やし挙上重量を伸ばす）</option>
+                <option value="引き締め・細マッチョ（体脂肪率を下げ筋肉を強調）">⚡ 引き締め・細マッチョ（体重維持〜微減で引き締める）</option>
+                <option value="健康維持・体力向上（コンディション維持）">🌱 健康維持・体力向上（無理のない習慣と体型維持）</option>
+              </select>
+            </div>
+            <p class="text-[11px] text-slate-400">
+              ※ 選択した目的に応じて、AIが提案する推奨セット数・重量負荷・食事アドバイス（高タンパクか炭水化物補給か等）が自動的に最適化されます。
+            </p>
           </div>
         </div>
 

@@ -73,6 +73,7 @@ class AiService
                 'age' => (int)$goal->age,
                 'gender' => $goal->gender,
                 'workout_environment' => $goal->workout_environment,
+                'activity_level' => $goal->activity_level ?? 'moderate',
                 'target_weight' => (float)$goal->target_weight,
                 'target_body_fat' => (float)($goal->target_body_fat ?? 0),
                 'start_weight' => (float)($goal->start_weight ?? $latestMetric->weight),
@@ -142,26 +143,43 @@ class AiService
     }
 
     /**
-     * 目標に応じたデフォルト処方箋
+     * 目標・運動量に応じたデフォルト処方箋
      */
     protected function getDefaultAdvice(Goal $goal): array
     {
+        $obj = $goal->objective ?? '';
+        $isBulk = str_contains($obj, '増量') || str_contains($obj, 'バルクアップ');
+        $isCut = str_contains($obj, '減量') || str_contains($obj, '除脂肪');
+
+        $sets = '10回 × 3セット';
+        if ($isBulk) {
+            $sets = '8〜10回 × 4セット';
+        } elseif ($goal->activity_level === 'sedentary' || $goal->activity_level === 'light') {
+            $sets = '12〜15回 × 2〜3セット';
+        }
+
+        $tip = '十分なタンパク質摂取（体重×1.5g目安）と1日2L以上の水分補給を心がけてください。';
+        if ($isBulk) {
+            $tip = '筋肉合成を最大化するため、毎食の炭水化物（白米・イモ類）をしっかり補給し、睡眠8時間を確保しましょう。';
+        } elseif ($isCut) {
+            $tip = '筋分解を防ぐため高タンパク（体重×1.8g以上）を徹底し、1日2.5L以上の水分補給で代謝を維持しましょう。';
+        }
+
         return [
             'pace_status' => 'on_track',
             'pace_status_label' => '順調な推移',
             'pace_message' => '日々の計測データの蓄積が目標達成の第一歩です。この調子で記録を継続しましょう。',
             'timeline_gap' => '目標体重 ' . ($goal->target_weight ?? 65.0) . 'kg に向けて着実に前進しています。',
-            'next_action' => '前回のトレーニング部位を休ませ、無理のない負荷で別部位を鍛えましょう。',
+            'next_action' => $isBulk ? '高重量×多セットで総負荷量を稼ぎ、筋肥大シグナルを送りましょう。' : '筋力を維持しつつ、疲労していない大筋群を無理なく刺激しましょう。',
             'recommended_workout' => [
                 'target_muscle' => '背中',
                 'exercise' => 'ダンベルロウ または チンニング',
-                'suggested_weight' => '中重量（10回で適度な負荷）',
-                'suggested_sets' => '10回 × 3セット',
-                'point' => '肩甲骨の寄せを意識して背筋を収縮させましょう。',
+                'suggested_weight' => '中重量（適正負荷）',
+                'suggested_sets' => $sets,
+                'point' => '肩甲骨の寄せを意識して背筋全体を収縮させましょう。',
             ],
-            'lifestyle_tip' => '高タンパクな食事と良質な睡眠（7時間以上）を維持しましょう。',
+            'lifestyle_tip' => $tip,
         ];
-    }
     }
 }
 
