@@ -171,3 +171,4 @@ const chartOptions = computed(() => ({
   },
 }));
 </script>
+

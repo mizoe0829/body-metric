@@ -419,3 +419,4 @@ const formatDate = (dateString) => {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 };
 </script>
+

@@ -68,3 +68,4 @@ class SettingsController extends Controller
         return redirect()->route('dashboard')->with('success', '目標およびプロファイル設定を更新しました！');
     }
 }
+

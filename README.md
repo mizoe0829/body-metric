@@ -57,15 +57,32 @@ graph LR
 
 ---
 
-## 🚀 クイックスタート
+## 🚀 起動方法（2つのスタイル）
 
-### 1. 必要要件
-- PHP >= 8.2 & Composer
-- Node.js >= 20 & npm
-- Go >= 1.22
-- Google Gemini API Key
+### 🌟 方法A: Windows ワンクリック起動（最速・手軽）
+1. `start.bat` をダブルクリックします。
+   - Go AI マイクロサービス (ポート8086) と Laravel Web サーバー (ポート8000) が自動起動し、ブラウザで `http://localhost:8000` が開きます。
+2. 終了したいときは `stop.bat` をダブルクリックするだけで全プロセスが安全に停止します。
 
-### 2. 環境構築
+### 🐳 方法B: Docker Compose（完全ポータブル・コンテナ運用）
+Docker Desktop がインストールされている場合、以下のコマンド一発で立ち上がります。
+
+```bash
+# コンテナビルド＆バックグラウンド起動
+docker compose up -d --build
+
+# ログ確認
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+- ブラウザで `http://localhost:8000` にアクセスします。
+- SQLite データベース（`database/`）はホスト側にボリュームマウントされているため、コンテナを破棄・再作成してもデータは保持されます。
+
+---
+
+## 🛠️ 開発者向け手動セットアップ（ネイティブ環境）
 ```bash
 # リポジトリ直下にて依存関係インストール
 composer install

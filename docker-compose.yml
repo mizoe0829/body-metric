@@ -1,0 +1,34 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: body-metric-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=http://localhost:8000
+      - APP_KEY=base64:gjpYwle0JRO6VXV//WkF5phGYmg0y/2i6ACjCQKQ6so=
+      - DB_CONNECTION=sqlite
+      - AI_SERVICE_URL=http://ai-service:8086
+    volumes:
+      - ./database:/var/www/html/database
+      - ./storage:/var/www/html/storage
+    depends_on:
+      - ai-service
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: body-metric-ai
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-AQ.Ab8RN6LpdXwmpz40_RIERwsV0Em-f1z90TNwip_ojOfPPDiPbg}
+      - GEMINI_MODEL=gemini-3.5-flash

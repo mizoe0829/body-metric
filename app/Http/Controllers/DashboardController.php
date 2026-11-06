@@ -162,3 +162,4 @@ class DashboardController extends Controller
         return redirect()->route('dashboard')->with('success', '計測ログを削除しました。');
     }
 }
+
