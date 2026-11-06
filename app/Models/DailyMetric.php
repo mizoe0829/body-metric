@@ -20,7 +20,7 @@ class DailyMetric extends Model
     ];
 
     protected $casts = [
-        'record_date' => 'date',
+        'record_date' => 'date:Y-m-d',
         'weight' => 'float',
         'body_fat' => 'float',
         'ai_feedback' => 'array',

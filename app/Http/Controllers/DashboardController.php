@@ -107,16 +107,27 @@ class DashboardController extends Controller
         $goal = Goal::where('is_active', true)->latest()->first();
 
         DB::transaction(function () use ($validated, $goal) {
+            $recordDate = Carbon::parse($validated['record_date'])->format('Y-m-d');
+
             // 同日の既存記録があれば上書き更新、なければ新規作成
-            $metric = DailyMetric::updateOrCreate(
-                ['record_date' => $validated['record_date']],
-                [
+            $metric = DailyMetric::whereDate('record_date', $recordDate)->first();
+
+            if ($metric) {
+                $metric->update([
                     'weight' => $validated['weight'],
                     'body_fat' => $validated['body_fat'] ?? null,
                     'memo' => $validated['memo'] ?? null,
                     'raw_input' => $validated['memo'] ?? null,
-                ]
-            );
+                ]);
+            } else {
+                $metric = DailyMetric::create([
+                    'record_date' => $recordDate,
+                    'weight' => $validated['weight'],
+                    'body_fat' => $validated['body_fat'] ?? null,
+                    'memo' => $validated['memo'] ?? null,
+                    'raw_input' => $validated['memo'] ?? null,
+                ]);
+            }
 
             // メモが存在する場合、AIで筋トレ種目を自動抽出
             if (!empty($validated['memo'])) {
