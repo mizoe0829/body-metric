@@ -176,6 +176,152 @@ func callGemini(prompt string) (string, error) {
 	return "", lastErr
 }
 
+func cleanJSON(raw string) string {
+	s := strings.TrimSpace(raw)
+	// ```json ... ``` または ``` ... ``` を除去
+	if strings.HasPrefix(s, "```") {
+		lines := strings.Split(s, "\n")
+		if len(lines) >= 2 {
+			// 先頭行 (```json) を除外
+			lines = lines[1:]
+			// 末尾行 (```) を除外
+			if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[len(lines)-1]), "```") {
+				lines = lines[:len(lines)-1]
+			}
+			s = strings.TrimSpace(strings.Join(lines, "\n"))
+		}
+	}
+	return s
+}
+
+var validMuscles = map[string]bool{
+	"胸": true, "背中": true, "脚": true, "肩": true, "腕": true, "腹": true, "有酸素": true, "全身": true,
+}
+
+func sanitizeWorkouts(items []WorkoutItem) []WorkoutItem {
+	var valid []WorkoutItem
+	for _, it := range items {
+		name := strings.TrimSpace(it.ExerciseName)
+		if name == "" {
+			continue
+		}
+		if len([]rune(name)) > 50 {
+			name = string([]rune(name)[:50])
+		}
+
+		muscle := strings.TrimSpace(it.TargetMuscle)
+		if !validMuscles[muscle] {
+			muscle = "全身"
+		}
+
+		w := it.Weight
+		if w < 0 {
+			w = 0
+		} else if w > 500 {
+			w = 500
+		}
+
+		reps := it.Reps
+		if reps < 0 {
+			reps = 0
+		} else if reps > 100 {
+			reps = 100
+		}
+
+		sets := it.Sets
+		if sets < 0 {
+			sets = 0
+		} else if sets > 30 {
+			sets = 30
+		}
+
+		valid = append(valid, WorkoutItem{
+			ExerciseName: name,
+			TargetMuscle: muscle,
+			Weight:       w,
+			Reps:         reps,
+			Sets:         sets,
+			Notes:        strings.TrimSpace(it.Notes),
+		})
+	}
+	return valid
+}
+
+func sanitizeAdvice(adv *AdviceResponse, req GenerateAdviceRequest) {
+	// 1. pace_status の検証
+	switch adv.PaceStatus {
+	case "on_track", "ahead", "behind", "plateau":
+		// OK
+	default:
+		adv.PaceStatus = "on_track"
+	}
+
+	// 2. ラベルの補正
+	if adv.PaceStatusLabel == "" {
+		switch adv.PaceStatus {
+		case "ahead":
+			adv.PaceStatusLabel = "前倒し好調"
+		case "behind":
+			adv.PaceStatusLabel = "要ペース調整"
+		case "plateau":
+			adv.PaceStatusLabel = "停滞期ブレイク推奨"
+		default:
+			adv.PaceStatusLabel = "順調なペース"
+		}
+	}
+
+	// 3. テキストの欠落補正
+	if strings.TrimSpace(adv.PaceMessage) == "" {
+		adv.PaceMessage = "目標値に向けて着実に前進しています。日々の記録継続が最大の推進力です。"
+	}
+
+	if strings.TrimSpace(adv.TimelineGap) == "" {
+		adv.TimelineGap = fmt.Sprintf("目標体重 %.1fkg に向けたアプローチを維持しましょう。", req.Goal.TargetWeight)
+	}
+
+	if strings.TrimSpace(adv.NextAction) == "" {
+		adv.NextAction = "前回のトレーニング部位を休ませ、バランスよく全身をローテーションしましょう。"
+	}
+
+	if strings.TrimSpace(adv.LifestyleTip) == "" {
+		adv.LifestyleTip = "十分なタンパク質補給（体重×1.5g目安）と1日2L以上の水分補給を心がけてください。"
+	}
+
+	// 4. recommended_workout の検証
+	if strings.TrimSpace(adv.RecommendedWorkout.Exercise) == "" {
+		switch req.Goal.WorkoutEnvironment {
+		case "dumbbell":
+			adv.RecommendedWorkout = RecommendedWorkout{
+				TargetMuscle:    "背中",
+				Exercise:        "ダンベルワンハンドロウ",
+				SuggestedWeight: "14〜16kgダンベル",
+				SuggestedSets:   "10回 × 3セット",
+				Point:           "背筋を伸ばし、肘を腰骨へ向かって引く意識で広背筋を収縮させましょう。",
+			}
+		case "bodyweight":
+			adv.RecommendedWorkout = RecommendedWorkout{
+				TargetMuscle:    "胸・体幹",
+				Exercise:        "プッシュアップ (腕立て伏せ)",
+				SuggestedWeight: "自体重",
+				SuggestedSets:   "12〜15回 × 3セット",
+				Point:           "体を一直線に保ち、胸を床ギリギリまで深く下ろしましょう。",
+			}
+		default:
+			adv.RecommendedWorkout = RecommendedWorkout{
+				TargetMuscle:    "背中",
+				Exercise:        "ラットプルダウン または チンニング",
+				SuggestedWeight: "中重量（10回で適正負荷）",
+				SuggestedSets:   "10回 × 3セット",
+				Point:           "肩甲骨を引き寄せて背筋全体でバーを引きましょう。",
+			}
+		}
+	}
+
+	if strings.TrimSpace(adv.RecommendedWorkout.TargetMuscle) == "" {
+		adv.RecommendedWorkout.TargetMuscle = "全身"
+	}
+}
+
 func handleParseWorkout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -222,14 +368,28 @@ func handleParseWorkout(w http.ResponseWriter, r *http.Request) {
 	resText, err := callGemini(prompt)
 	if err != nil {
 		log.Printf("Gemini call error: %v", err)
-		// フォールバック: 空の配列を返却
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ParseWorkoutResponse{Workouts: []WorkoutItem{}})
 		return
 	}
 
+	// 1. JSON クレンジング
+	cleanStr := cleanJSON(resText)
+
+	// 2. 構造体へのデコード（構文チェック）
+	var resp ParseWorkoutResponse
+	if err := json.Unmarshal([]byte(cleanStr), &resp); err != nil {
+		log.Printf("Failed to unmarshal parse-workout JSON: %v. Raw text: %s", err, cleanStr)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ParseWorkoutResponse{Workouts: []WorkoutItem{}})
+		return
+	}
+
+	// 3. バリデーション & サニタイズ
+	resp.Workouts = sanitizeWorkouts(resp.Workouts)
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(resText))
+	json.NewEncoder(w).Encode(resp)
 }
 
 func handleGenerateAdvice(w http.ResponseWriter, r *http.Request) {
@@ -277,31 +437,41 @@ func handleGenerateAdvice(w http.ResponseWriter, r *http.Request) {
 `, string(reqBytes))
 
 	resText, err := callGemini(prompt)
+
+	var advice AdviceResponse
+
 	if err != nil {
 		log.Printf("Gemini call error: %v", err)
-		// フォールバック返却
-		fallback := AdviceResponse{
+		// デフォルトフォールバック
+		advice = AdviceResponse{
 			PaceStatus:      "on_track",
 			PaceStatusLabel: "順調なペース",
 			PaceMessage:     "目標達成に向けて順調に推移しています。継続が最大の武器です。",
 			TimelineGap:     fmt.Sprintf("目標体重 %.1fkg に向けて着実に前進しています。", req.Goal.TargetWeight),
 			NextAction:      "直近のトレーニング部位を休ませ、バランスよく全身を鍛えましょう。",
-			RecommendedWorkout: RecommendedWorkout{
-				TargetMuscle:    "背中",
-				Exercise:        "ラットプルダウン または ダンベルロウ",
-				SuggestedWeight: "中重量（10回でややキツい重さ）",
-				SuggestedSets:   "10回 × 3セット",
-				Point:           "肩甲骨を引き寄せて背筋を収縮させましょう。",
-			},
-			LifestyleTip: "十分なタンパク質摂取（体重×1.5g目安）と水分補給を心がけてください。",
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(fallback)
-		return
+	} else {
+		// 1. JSON クレンジング
+		cleanStr := cleanJSON(resText)
+
+		// 2. 構造体へのデコード（構文チェック）
+		if err := json.Unmarshal([]byte(cleanStr), &advice); err != nil {
+			log.Printf("Failed to unmarshal advice JSON: %v. Raw text: %s", err, cleanStr)
+			advice = AdviceResponse{
+				PaceStatus:      "on_track",
+				PaceStatusLabel: "順調なペース",
+				PaceMessage:     "目標達成に向けて順調に推移しています。",
+				TimelineGap:     fmt.Sprintf("目標体重 %.1fkg に向けて前進中です。", req.Goal.TargetWeight),
+				NextAction:      "超回復を意識し、疲労していない部位を無理なく鍛えましょう。",
+			}
+		}
 	}
 
+	// 3. バリデーション & 欠落補正
+	sanitizeAdvice(&advice, req)
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(resText))
+	json.NewEncoder(w).Encode(advice)
 }
 
 func main() {

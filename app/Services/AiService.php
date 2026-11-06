@@ -99,7 +99,10 @@ class AiService
             $response = Http::timeout(25)->post("{$this->baseUrl}/api/generate-advice", $payload);
 
             if ($response->successful()) {
-                return $response->json() ?? [];
+                $data = $response->json();
+                if (is_array($data)) {
+                    return $this->ensureAdviceSchema($data, $goal);
+                }
             }
 
             Log::warning('AI generate-advice request failed', ['status' => $response->status()]);
@@ -107,12 +110,47 @@ class AiService
             Log::error('AI generate-advice exception: ' . $e->getMessage());
         }
 
-        // フォールバック
+        return $this->getDefaultAdvice($goal);
+    }
+
+    /**
+     * AI回答の構造スキーマを検証し、欠落キーをフォールバック補完
+     */
+    protected function ensureAdviceSchema(array $data, Goal $goal): array
+    {
+        $defaults = $this->getDefaultAdvice($goal);
+
+        $merged = array_merge($defaults, $data);
+
+        // recommended_workout オブジェクトの深層マージ・バリデーション
+        if (!isset($data['recommended_workout']) || !is_array($data['recommended_workout'])) {
+            $merged['recommended_workout'] = $defaults['recommended_workout'];
+        } else {
+            $merged['recommended_workout'] = array_merge(
+                $defaults['recommended_workout'],
+                $data['recommended_workout']
+            );
+        }
+
+        // pace_status の許容値バリデーション
+        $allowedStatuses = ['on_track', 'ahead', 'behind', 'plateau'];
+        if (!in_array($merged['pace_status'] ?? '', $allowedStatuses, true)) {
+            $merged['pace_status'] = 'on_track';
+        }
+
+        return $merged;
+    }
+
+    /**
+     * 目標に応じたデフォルト処方箋
+     */
+    protected function getDefaultAdvice(Goal $goal): array
+    {
         return [
             'pace_status' => 'on_track',
             'pace_status_label' => '順調な推移',
             'pace_message' => '日々の計測データの蓄積が目標達成の第一歩です。この調子で記録を継続しましょう。',
-            'timeline_gap' => '目標体重 ' . $goal->target_weight . 'kg に向けて着実に前進しています。',
+            'timeline_gap' => '目標体重 ' . ($goal->target_weight ?? 65.0) . 'kg に向けて着実に前進しています。',
             'next_action' => '前回のトレーニング部位を休ませ、無理のない負荷で別部位を鍛えましょう。',
             'recommended_workout' => [
                 'target_muscle' => '背中',
@@ -123,6 +161,7 @@ class AiService
             ],
             'lifestyle_tip' => '高タンパクな食事と良質な睡眠（7時間以上）を維持しましょう。',
         ];
+    }
     }
 }
 
