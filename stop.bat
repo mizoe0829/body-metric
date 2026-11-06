@@ -1,18 +1,17 @@
 @echo off
-chcp 65001 > nul
-echo ===================================================
-echo   BodyMetric 停止スクリプト
-echo ===================================================
+title BodyMetric Stopper
+cd /d "%~dp0"
 
-echo [*] body-metric-ai.exe を停止しています...
+echo [*] Stopping body-metric-ai.exe...
 taskkill /F /IM body-metric-ai.exe 2>nul
 
-echo [*] ポート 8000 の Web サーバー (php) を停止しています...
+echo [*] Stopping PHP server on port 8000...
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8000" ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a 2>nul
 )
 
-echo ===================================================
-echo   ✅ BodyMetric を正常に停止しました。
-echo ===================================================
-timeout /t 2 /nobreak > nul
+echo.
+echo ========================================================
+echo   BodyMetric stopped successfully.
+echo ========================================================
+ping 127.0.0.1 -n 2 > nul

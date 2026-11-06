@@ -14,3 +14,4 @@ COPY --from=builder /app/body-metric-ai .
 EXPOSE 8086
 
 CMD ["./body-metric-ai"]
+
